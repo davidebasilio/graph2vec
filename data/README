@@ -1,0 +1,3 @@
+Add data here.
+One directory per original graph.
+Inside the directory, tsv files with the edge lists for the original and generated graphs.

@@ -9,6 +9,7 @@ from tqdm import tqdm
 from joblib import Parallel, delayed
 from param_parser import parameter_parser
 from gensim.models.doc2vec import Doc2Vec, TaggedDocument
+import csv
 
 class WeisfeilerLehmanMachine:
     """
@@ -60,16 +61,19 @@ def dataset_reader(path):
     :return features: Features hash table.
     :return name: Name of the graph.
     """
-    name = path.strip(".json").split("/")[-1]
-    data = json.load(open(path))
-    graph = nx.from_edgelist(data["edges"])
+    name = path.strip(".el").split("/")[-1]
 
-    if "features" in data.keys():
-        features = data["features"]
-    else:
-        features = nx.degree(graph)
+    edges = []
+    with open(path) as tsvfile:
+      reader = csv.reader(tsvfile, delimiter='\t')
+      edges = [row for row in reader]
+    graph = nx.from_edgelist(edges)
 
-    features = {int(k): v for k, v in features.items()}
+    # Use degree as feature
+    features = nx.degree(graph)
+
+    # features = {int(k): v for k, v in features.items()}
+    features = dict(features)
     return graph, features, name
 
 def feature_extractor(path, rounds):
@@ -94,8 +98,8 @@ def save_embedding(output_path, model, files, dimensions):
     """
     out = []
     for f in files:
-        identifier = f.split("/")[-1].strip(".json")
-        out.append([int(identifier)] + list(model.docvecs["g_"+identifier]))
+        identifier = f.split("/")[-1].strip(".el")
+        out.append([identifier] + list(model.docvecs["g_"+identifier]))
     column_names = ["type"]+["x_"+str(dim) for dim in range(dimensions)]
     out = pd.DataFrame(out, columns=column_names)
     out = out.sort_values(["type"])
@@ -107,8 +111,8 @@ def main(args):
     Learn the embedding and save it.
     :param args: Object with the arguments.
     """
-    graphs = glob.glob(args.input_path + "*.json")
-    print("\nFeature extraction started.\n")
+    graphs = glob.glob(args.input_path + "/*.el")
+    print("\nFeature extraction started ({} graphs).\n".format(len(graphs)))
     document_collections = Parallel(n_jobs=args.workers)(delayed(feature_extractor)(g, args.wl_iterations) for g in tqdm(graphs))
     print("\nOptimization started.\n")
 
